@@ -203,6 +203,8 @@ try_connect( State = #state{ client      = OldClient,
   end.
 
 
+reconn_time( #state{ reconn_min = ReconnMin, reconn_time = undefined } ) ->
+  ReconnMin;
 reconn_time( #state{ reconn_min = ReconnMin, reconn_time = 0 } ) ->
   ReconnMin;
 reconn_time( #state{ reconn_max = ReconnMax, reconn_time = ReconnMax } ) ->
