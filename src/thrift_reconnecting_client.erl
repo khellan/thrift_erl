@@ -24,7 +24,8 @@
 %% API
 -export([ call/3,
           get_stats/1,
-          get_and_reset_stats/1 ]).
+          get_and_reset_stats/1,
+          attempt_connect/1 ]).
 
 -export([ start_link/6 ]).
 
@@ -71,6 +72,9 @@ get_stats( Pid ) ->
 
 get_and_reset_stats( Pid ) ->
   gen_server:call( Pid, get_and_reset_stats ).
+
+attempt_connect( Pid ) ->
+    gen_server:cast( Pid, try_connect ).
 
 %%====================================================================
 %% gen_server callbacks
@@ -147,6 +151,9 @@ handle_call( get_and_reset_stats,
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
+handle_cast( try_connect, State ) ->
+    { noreply, try_connect( State ) };
+
 handle_cast( _Msg, State ) ->
   { noreply, State }.
 
@@ -198,7 +205,8 @@ try_connect( State = #state{ client      = OldClient,
       ReconnTime = reconn_time( State ),
       error_logger:error_msg( "[~w] ~w connect failed (~w), trying again in ~w ms~n",
                               [ self(), TSvc, Msg, ReconnTime ] ),
-      erlang:send_after( ReconnTime, self(), try_connect ),
+      {ok, _} = timer:apply_after(
+          ReconnTime, ?MODULE, attempt_connect, [ self() ] ),
       State#state{ client = nil, reconn_time = ReconnTime }
   end.
 
