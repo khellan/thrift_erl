@@ -38,6 +38,7 @@
          listen=null,
          acceptor=null,
          socket_opts=[{recv_timeout, 500}],
+         protocol_opts=[{strict_read, true}, {strict_write, true}],
          framed=false
         }).
 
@@ -104,7 +105,9 @@ parse_options([{max, Max} | Rest], State) ->
              end,
     parse_options(Rest, State#thrift_socket_server{max=MaxInt});
 parse_options([{framed, Framed} | Rest], State) when is_boolean(Framed) ->
-    parse_options(Rest, State#thrift_socket_server{framed=Framed}).
+    parse_options(Rest, State#thrift_socket_server{framed=Framed});
+parse_options([{protocol_opts, L} | Rest], State) when is_list(L) ->
+    parse_options(Rest, State#thrift_socket_server{protocol_opts=L}).
 
 start_server(State=#thrift_socket_server{name=Name}) ->
     case Name of
@@ -168,14 +171,15 @@ new_acceptor(State=#thrift_socket_server{max=0}) ->
     State#thrift_socket_server{acceptor=null};
 new_acceptor(State=#thrift_socket_server{listen=Listen,
                                          service=Service, handler=Handler,
-                                         socket_opts=Opts, framed=Framed
+                                         socket_opts=Opts, framed=Framed,
+                                         protocol_opts=ProtocolOpts
                                         }) ->
     Pid = proc_lib:spawn_link(?MODULE, acceptor_loop,
-                              [{self(), Listen, Service, Handler, Opts, Framed}]),
+                              [{self(), Listen, Service, Handler, Opts, ProtocolOpts, Framed}]),
     State#thrift_socket_server{acceptor=Pid}.
 
-acceptor_loop({Server, Listen, Service, Handler, SocketOpts, Framed})
-  when is_pid(Server), is_list(SocketOpts) ->
+acceptor_loop({Server, Listen, Service, Handler, SocketOpts, ProtocolOpts, Framed})
+  when is_pid(Server), is_list(SocketOpts), is_list(ProtocolOpts) ->
     case catch gen_tcp:accept(Listen) of % infinite timeout
         {ok, Socket} ->
             gen_server:cast(Server, {accepted, self()}),
@@ -186,7 +190,8 @@ acceptor_loop({Server, Listen, Service, Handler, SocketOpts, Framed})
                                        true  -> thrift_framed_transport:new(SocketTransport);
                                        false -> thrift_buffered_transport:new(SocketTransport)
                                    end,
-                               {ok, Protocol}          = thrift_binary_protocol:new(Transport),
+                                   error_logger:error_msg("Startng new protocol with Options ~w\n", [ProtocolOpts]),
+                               {ok, Protocol}          = thrift_binary_protocol:new(Transport, ProtocolOpts),
                                {ok, Protocol}
                        end,
             thrift_processor:init({Server, ProtoGen, Service, Handler});
