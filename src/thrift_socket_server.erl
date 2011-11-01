@@ -190,7 +190,6 @@ acceptor_loop({Server, Listen, Service, Handler, SocketOpts, ProtocolOpts, Frame
                                        true  -> thrift_framed_transport:new(SocketTransport);
                                        false -> thrift_buffered_transport:new(SocketTransport)
                                    end,
-                                   error_logger:error_msg("Startng new protocol with Options ~w\n", [ProtocolOpts]),
                                {ok, Protocol}          = thrift_binary_protocol:new(Transport, ProtocolOpts),
                                {ok, Protocol}
                        end,
